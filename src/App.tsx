@@ -25,7 +25,8 @@ const DashboardContent: React.FC = () => {
   const { 
     currentUser,
     role, 
-    activeTab, 
+    activeTab,
+    setActiveTab,
     inviteTokenFromUrl, 
     setInviteTokenFromUrl 
   } = useBuilding();
@@ -91,21 +92,48 @@ const DashboardContent: React.FC = () => {
             <div>
               {activeTab === 'overview' && (
                 <div className="space-y-6">
+                  <div className="rounded-3xl bg-white border border-slate-200 p-5 sm:p-6 shadow-xs">
+                    <h2 className="text-lg sm:text-xl font-black text-slate-900">סקירת ועד הבית</h2>
+                    <p className="text-sm text-slate-600 mt-1 leading-relaxed">
+                      מצב הקופה, חובות שדורשים טיפול, וגבייה חודשית — במקום אחד.
+                    </p>
+                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('tenants_mgmt')}
+                        className="text-right p-4 rounded-2xl border border-indigo-100 bg-indigo-50/50 hover:bg-indigo-50 min-h-[72px]"
+                      >
+                        <div className="text-sm font-black text-indigo-900">דיירים והזמנות</div>
+                        <div className="text-xs text-indigo-700/80 mt-1">ניהול גישה וספר נכסים</div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('financials')}
+                        className="text-right p-4 rounded-2xl border border-emerald-100 bg-emerald-50/50 hover:bg-emerald-50 min-h-[72px]"
+                      >
+                        <div className="text-sm font-black text-emerald-900">כספים</div>
+                        <div className="text-xs text-emerald-700/80 mt-1">יומן, פרויקטים וניתוח</div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('insurance')}
+                        className="text-right p-4 rounded-2xl border border-slate-200 bg-slate-50 hover:bg-slate-100 min-h-[72px]"
+                      >
+                        <div className="text-sm font-black text-slate-900">ביטוח וקהילה</div>
+                        <div className="text-xs text-slate-600 mt-1">ביטוח, החלטות ותקנון</div>
+                      </button>
+                    </div>
+                  </div>
                   <KpiHeader />
                   <RetroactiveDuesCard />
                   <MonthlyCollectionBreakdown />
-                  <PropertyDirectory onOpenHazardModal={() => setIsHazardModalOpen(true)} />
                 </div>
               )}
 
-              {activeTab === 'tenants_mgmt' && (
-                <TenantManagement />
-              )}
-
-              {activeTab === 'residents' && (
+              {(activeTab === 'tenants_mgmt' || activeTab === 'residents') && (
                 <div className="space-y-6">
+                  <TenantManagement />
                   <PropertyDirectory onOpenHazardModal={() => setIsHazardModalOpen(true)} />
-                  <SafetyRulesCard onOpenCharterModal={() => setIsCharterModalOpen(true)} />
                 </div>
               )}
 
@@ -118,15 +146,9 @@ const DashboardContent: React.FC = () => {
                 </div>
               )}
 
-              {activeTab === 'insurance' && (
+              {(activeTab === 'insurance' || activeTab === 'notices') && (
                 <div className="space-y-6">
                   <InsuranceDashboard />
-                  <CommunityDecisions />
-                </div>
-              )}
-
-              {activeTab === 'notices' && (
-                <div className="space-y-6">
                   <CommunityDecisions />
                   <SafetyRulesCard onOpenCharterModal={() => setIsCharterModalOpen(true)} />
                 </div>
@@ -176,7 +198,7 @@ const DashboardContent: React.FC = () => {
             </button>
             <span>•</span>
             <span className="flex items-center gap-1 text-emerald-700 font-bold">
-              <ShieldCheck className="w-3.5 h-3.5" /> פורטל דיירים מאובטח (Vercel Cloud 24/7)
+              <ShieldCheck className="w-3.5 h-3.5" /> פורטל דיירים מאובטח
             </span>
           </div>
         </div>

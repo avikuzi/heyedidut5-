@@ -232,80 +232,56 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAddModal, onOpenImportModa
 
           </div>
 
-          {/* Tab Navigation (Admin Only) */}
+          {/* Tab Navigation (Admin Only) — 4 clear sections */}
           {role === 'admin' && (
-            <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto border-t border-slate-100 pt-1 -mb-px scrollbar-none text-xs font-bold">
+            <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto border-t border-slate-100 pt-1 -mb-px scrollbar-none text-sm font-bold">
               
               <button
                 onClick={() => setActiveTab('overview')}
-                className={`flex items-center gap-1.5 py-2.5 px-3 border-b-2 whitespace-nowrap transition-all ${
+                className={`flex items-center gap-1.5 py-3 px-3.5 border-b-2 whitespace-nowrap transition-all min-h-[44px] ${
                   activeTab === 'overview'
                     ? 'border-emerald-600 text-emerald-700'
                     : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <Layers className="w-3.5 h-3.5" />
-                לוח בקרה ראשי
+                <Layers className="w-4 h-4" />
+                סקירה
               </button>
 
               <button
                 onClick={() => setActiveTab('tenants_mgmt')}
-                className={`flex items-center gap-1.5 py-2.5 px-3 border-b-2 whitespace-nowrap transition-all ${
-                  activeTab === 'tenants_mgmt'
+                className={`flex items-center gap-1.5 py-3 px-3.5 border-b-2 whitespace-nowrap transition-all min-h-[44px] ${
+                  activeTab === 'tenants_mgmt' || activeTab === 'residents'
                     ? 'border-indigo-600 text-indigo-700'
                     : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <UserCheck className="w-3.5 h-3.5 text-indigo-600" />
-                ניהול דיירים והזמנות
-              </button>
-
-              <button
-                onClick={() => setActiveTab('residents')}
-                className={`flex items-center gap-1.5 py-2.5 px-3 border-b-2 whitespace-nowrap transition-all ${
-                  activeTab === 'residents'
-                    ? 'border-emerald-600 text-emerald-700'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <Users className="w-3.5 h-3.5" />
-                ספר נכסים (9 נכסים)
+                <UserCheck className="w-4 h-4 text-indigo-600" />
+                דיירים
               </button>
 
               <button
                 onClick={() => setActiveTab('financials')}
-                className={`flex items-center gap-1.5 py-2.5 px-3 border-b-2 whitespace-nowrap transition-all ${
+                className={`flex items-center gap-1.5 py-3 px-3.5 border-b-2 whitespace-nowrap transition-all min-h-[44px] ${
                   activeTab === 'financials'
                     ? 'border-emerald-600 text-emerald-700'
                     : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <PieChart className="w-3.5 h-3.5" />
-                שקיפות כספית וצנרת
+                <PieChart className="w-4 h-4" />
+                כספים
               </button>
 
               <button
                 onClick={() => setActiveTab('insurance')}
-                className={`flex items-center gap-1.5 py-2.5 px-3 border-b-2 whitespace-nowrap transition-all ${
-                  activeTab === 'insurance'
+                className={`flex items-center gap-1.5 py-3 px-3.5 border-b-2 whitespace-nowrap transition-all min-h-[44px] ${
+                  activeTab === 'insurance' || activeTab === 'notices'
                     ? 'border-emerald-600 text-emerald-700'
                     : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
-                ביטוח מבנה מורחב
-              </button>
-
-              <button
-                onClick={() => setActiveTab('notices')}
-                className={`flex items-center gap-1.5 py-2.5 px-3 border-b-2 whitespace-nowrap transition-all ${
-                  activeTab === 'notices'
-                    ? 'border-emerald-600 text-emerald-700'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <FileText className="w-3.5 h-3.5" />
-                החלטות ותקנון
+                <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                ביטוח וקהילה
               </button>
 
             </div>
