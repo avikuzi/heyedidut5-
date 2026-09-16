@@ -44,6 +44,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({ isOpen
       amount: numAmount,
       status: 'completed',
       propertyId: propertyId ? parseInt(propertyId, 10) : undefined,
+      apartmentNumber: propertyId ? parseInt(propertyId, 10) : undefined,
       notes: notes.trim() || undefined
     });
 

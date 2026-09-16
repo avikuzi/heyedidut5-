@@ -18,18 +18,22 @@ interface LoginModalProps {
 }
 
 export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
-  const { users, login, switchUser, currentUser } = useBuilding();
+  const { users, login, switchUser, currentUser, dataSource } = useBuilding();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   if (!isOpen) return null;
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    const success = login(email, password);
+    setIsSubmitting(true);
+    const success = await login(email, password);
+    setIsSubmitting(false);
     if (success) {
       onClose();
     } else {
@@ -111,14 +115,16 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 
             <button
               type="submit"
-              className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white text-xs font-black shadow-md transition-all flex items-center justify-center gap-1.5"
+              disabled={isSubmitting}
+              className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white text-xs font-black shadow-md transition-all flex items-center justify-center gap-1.5 disabled:opacity-60"
             >
               <LogIn className="w-4 h-4" />
-              התחבר
+              {isSubmitting ? 'מתחבר…' : 'התחבר'}
             </button>
           </form>
 
-          {/* Quick Demo Switcher */}
+          {/* Quick Demo Switcher — local fallback only (not real Auth) */}
+          {dataSource === 'local' && (
           <div className="pt-4 border-t border-slate-100 space-y-2">
             <span className="text-[11px] font-bold text-slate-400 block">
               מעבר מהיר לבדיקה (חשבונות מוגדרים מראש):
@@ -149,6 +155,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
               ))}
             </div>
           </div>
+          )}
 
           <div className="text-center">
             <p className="text-[11px] text-slate-500">

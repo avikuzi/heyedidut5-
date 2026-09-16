@@ -28,13 +28,27 @@ const DashboardContent: React.FC = () => {
     activeTab,
     setActiveTab,
     inviteTokenFromUrl, 
-    setInviteTokenFromUrl 
+    setInviteTokenFromUrl,
+    isLoading,
+    dataSource
   } = useBuilding();
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isHazardModalOpen, setIsHazardModalOpen] = useState(false);
   const [isCharterModalOpen, setIsCharterModalOpen] = useState(false);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 text-slate-900 font-hebrew flex items-center justify-center">
+        <div className="text-center space-y-2">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 via-emerald-500 to-teal-500 mx-auto" />
+          <div className="text-base font-black text-slate-800">הידידות 5</div>
+          <div className="text-sm text-slate-500">טוען את הפורטל…</div>
+        </div>
+      </div>
+    );
+  }
 
   // 1. If visitor arrived via invite link with token
   if (inviteTokenFromUrl) {
@@ -59,6 +73,9 @@ const DashboardContent: React.FC = () => {
       <div className="min-h-screen bg-slate-50 text-slate-900 font-hebrew flex flex-col justify-between">
         <div className="py-12">
           <PortalGateway />
+          <p className="text-center text-[11px] text-slate-400 mt-4">
+            {dataSource === 'supabase' ? 'מחובר ל-Supabase' : 'מצב מקומי (localStorage) · חברו Supabase לפי README'}
+          </p>
         </div>
         <footer className="bg-white border-t border-slate-200 py-6 text-xs text-slate-500 text-center">
           <div className="max-w-7xl mx-auto px-4 flex items-center justify-center gap-2">

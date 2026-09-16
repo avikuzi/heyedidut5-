@@ -21,41 +21,53 @@ import { useBuilding } from '../../context/BuildingContext';
 type GatewayStep = 'choose' | 'tenant' | 'admin' | 'help';
 
 export const PortalGateway: React.FC = () => {
-  const { login, adminLogin } = useBuilding();
+  const { login, adminLogin, dataSource, requestPasswordHelp } = useBuilding();
 
   const [step, setStep] = useState<GatewayStep>('choose');
   
   const [tenantEmail, setTenantEmail] = useState('');
   const [tenantPassword, setTenantPassword] = useState('');
   const [tenantError, setTenantError] = useState<string | null>(null);
+  const [tenantBusy, setTenantBusy] = useState(false);
 
+  const configuredAdminEmail = (import.meta.env.VITE_ADMIN_EMAIL || '').trim();
+  const [adminEmail, setAdminEmail] = useState(configuredAdminEmail);
   const [adminPass, setAdminPass] = useState('');
   const [adminError, setAdminError] = useState<string | null>(null);
+  const [adminBusy, setAdminBusy] = useState(false);
 
   const [helpEmail, setHelpEmail] = useState('');
   const [helpSent, setHelpSent] = useState(false);
 
-  const handleTenantLogin = (e: React.FormEvent) => {
+  const handleTenantLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setTenantError(null);
-    const success = login(tenantEmail, tenantPassword);
+    setTenantBusy(true);
+    const success = await login(tenantEmail, tenantPassword, 'tenant');
+    setTenantBusy(false);
     if (!success) {
       setTenantError('הכניסה נכשלה. בדקו אימייל וסיסמה, או בקשו עזרה מוועד הבית.');
     }
   };
 
-  const handleAdminLogin = (e: React.FormEvent) => {
+  const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setAdminError(null);
-    const success = adminLogin(adminPass);
+    setAdminBusy(true);
+    const success = await adminLogin(adminPass, adminEmail);
+    setAdminBusy(false);
     if (!success) {
-      setAdminError('סיסמת ניהול שגויה. נסו שוב.');
+      setAdminError(
+        dataSource === 'supabase'
+          ? 'הכניסה נכשלה. בדקו דוא״ל וסיסמה של ועד הבית.'
+          : 'סיסמת ניהול שגויה. נסו שוב.'
+      );
     }
   };
 
-  const handleHelpSubmit = (e: React.FormEvent) => {
+  const handleHelpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // No backend mail yet — guide the resident and record intent locally.
+    await requestPasswordHelp(helpEmail);
     setHelpSent(true);
   };
 
@@ -229,10 +241,11 @@ export const PortalGateway: React.FC = () => {
 
                 <button
                   type="submit"
-                  className="w-full py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white text-base font-black shadow-md transition-all flex items-center justify-center gap-2 min-h-[48px]"
+                  disabled={tenantBusy}
+                  className="w-full py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white text-base font-black shadow-md transition-all flex items-center justify-center gap-2 min-h-[48px] disabled:opacity-60"
                 >
                   <LogIn className="w-5 h-5" />
-                  כניסה לפורטל האישי
+                  {tenantBusy ? 'מתחבר…' : 'כניסה לפורטל האישי'}
                 </button>
 
                 <button
@@ -257,6 +270,28 @@ export const PortalGateway: React.FC = () => {
                   <h2 className="text-lg font-black text-slate-900">כניסת ועד הבית</h2>
                   <p className="text-sm text-slate-600 mt-1">מיועד לחברי הוועד בלבד.</p>
                 </div>
+
+                {(dataSource === 'supabase' && !configuredAdminEmail) && (
+                  <div>
+                    <label htmlFor="admin-email" className="block text-sm font-bold text-slate-700 mb-1.5">
+                      דוא״ל ועד
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="admin-email"
+                        name="admin-email"
+                        type="email"
+                        autoComplete="username"
+                        required
+                        placeholder="avi@example.com"
+                        value={adminEmail}
+                        onChange={(e) => setAdminEmail(e.target.value)}
+                        className="w-full text-base border border-slate-300 rounded-xl py-3.5 pr-10 pl-3 focus:outline-none focus:ring-2 focus:ring-slate-900 min-h-[48px]"
+                      />
+                      <Mail className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <label htmlFor="admin-password" className="block text-sm font-bold text-slate-700 mb-1.5">
@@ -287,10 +322,11 @@ export const PortalGateway: React.FC = () => {
 
                 <button
                   type="submit"
-                  className="w-full py-3.5 px-4 rounded-xl bg-slate-900 hover:bg-black active:scale-[0.99] text-white text-base font-black shadow-md transition-all flex items-center justify-center gap-2 min-h-[48px]"
+                  disabled={adminBusy}
+                  className="w-full py-3.5 px-4 rounded-xl bg-slate-900 hover:bg-black active:scale-[0.99] text-white text-base font-black shadow-md transition-all flex items-center justify-center gap-2 min-h-[48px] disabled:opacity-60"
                 >
                   <LogIn className="w-5 h-5" />
-                  כניסה לדשבורד הניהול
+                  {adminBusy ? 'מתחבר…' : 'כניסה לדשבורד הניהול'}
                 </button>
               </form>
             )}
@@ -301,7 +337,9 @@ export const PortalGateway: React.FC = () => {
                 <div>
                   <h2 className="text-lg font-black text-slate-900">עזרה ושחזור סיסמה</h2>
                   <p className="text-sm text-slate-600 mt-1 leading-relaxed">
-                    כרגע אין איפוס אוטומטי באתר. ועד הבית יכול לאפס את הרישום של הדירה או לשלוח קישור הזמנה מחדש.
+                    {dataSource === 'supabase'
+                      ? 'נשלח קישור לאיפוס סיסמה לאימייל אם החשבון קיים. אם לא הגיע מייל — פנו לוועד הבית.'
+                      : 'כרגע אין איפוס אוטומטי באתר. ועד הבית יכול לאפס את הרישום של הדירה או לשלוח קישור הזמנה מחדש.'}
                   </p>
                 </div>
 
@@ -309,7 +347,9 @@ export const PortalGateway: React.FC = () => {
                   <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-sm text-emerald-900 leading-relaxed flex items-start gap-2">
                     <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />
                     <div>
-                      <div className="font-black mb-1">הבקשה נרשמה אצלכם במכשיר</div>
+                      <div className="font-black mb-1">
+                        {dataSource === 'supabase' ? 'אם החשבון קיים — נשלח מייל לאיפוס' : 'הבקשה נרשמה אצלכם במכשיר'}
+                      </div>
                       פנו לוועד הבית עם כתובת האימייל של הדירה ובקשו איפוס סיסמה או קישור הזמנה חדש.
                     </div>
                   </div>
