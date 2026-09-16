@@ -42,7 +42,8 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAddModal, onOpenImportModa
     transactions,
     currentUser,
     logout,
-    resetToMockData
+    resetToMockData,
+    dataSource
   } = useBuilding();
 
   const [showFeeTooltip, setShowFeeTooltip] = useState(false);
@@ -102,6 +103,13 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAddModal, onOpenImportModa
                   </h1>
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100/80 text-amber-800 border border-amber-200/60">
                     7 דירות + 2 עסקים
+                  </span>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold border ${
+                    dataSource === 'supabase'
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                      : 'bg-slate-100 text-slate-600 border-slate-200'
+                  }`}>
+                    {dataSource === 'supabase' ? 'Supabase' : 'localStorage'}
                   </span>
                 </div>
                 
@@ -177,7 +185,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAddModal, onOpenImportModa
                     </span>
                   </div>
                   <button
-                    onClick={logout}
+                    onClick={() => { void logout(); }}
                     className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors mr-1"
                     title="התנתק"
                   >

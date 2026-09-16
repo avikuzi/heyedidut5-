@@ -6,9 +6,13 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "seed:sql": "node scripts/generate-seed.mjs",
+    "seed:users": "node --env-file=.env scripts/provision-demo-users.mjs",
+    "test:grounding": "node scripts/verify-grounding.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.116.0",
     "chart.js": "^4.4.7",
     "clsx": "^2.1.1",
     "lucide-react": "^0.475.0",
