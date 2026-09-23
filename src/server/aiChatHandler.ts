@@ -3,7 +3,7 @@ import {
   sanitizeGrounding,
   type AiIntent,
   type FetchLike
-} from '../lib/ai/committeeChat';
+} from '../lib/ai/committeeChat.js';
 import type { AiGroundingContext } from '../types/ai';
 
 export type ServerEnv = Record<string, string | undefined>;
@@ -115,7 +115,7 @@ export async function handleAiChat(
       }
       const build = deps?.buildGrounding;
       if (!build) {
-        const { buildGroundingFromSession } = await import('./supabaseGrounding');
+        const { buildGroundingFromSession } = await import('./supabaseGrounding.js');
         grounding = await buildGroundingFromSession({ jwt, periodLabel, env: input.env });
       } else {
         grounding = await build({ jwt, periodLabel, env: input.env });

@@ -1,6 +1,6 @@
 import type { Plugin } from 'vite';
 import { loadEnv } from 'vite';
-import { handleAiChat } from './aiChatHandler';
+import { handleAiChat } from './aiChatHandler.js';
 
 function readBody(req: NodeJS.ReadableStream): Promise<string> {
   return new Promise((resolve, reject) => {

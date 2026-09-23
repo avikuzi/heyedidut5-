@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
-import { sanitizeGrounding } from '../lib/ai/committeeChat';
+import { sanitizeGrounding } from '../lib/ai/committeeChat.js';
 import type { AiGroundingContext } from '../types/ai';
-import { AiHttpError, readServerSupabase, type ServerEnv } from './aiChatHandler';
+import { AiHttpError, readServerSupabase, type ServerEnv } from './aiChatHandler.js';
 
 export async function buildGroundingFromSession(options: {
   jwt: string;
