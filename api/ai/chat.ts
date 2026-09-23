@@ -1,4 +1,7 @@
-import { handleAiChat } from '../../src/server/aiChatHandler';
+// Vercel runs this file as Node ESM (`"type": "module"`). Relative imports
+// must include the .js extension that the compiler emits, or the function
+// crashes on load with ERR_MODULE_NOT_FOUND.
+import { handleAiChat } from '../../src/server/aiChatHandler.js';
 
 type ApiRequest = {
   method?: string;
@@ -19,11 +22,16 @@ function headerValue(headers: ApiRequest['headers'], name: string): string | und
 
 /** Vercel serverless: POST /api/ai/chat */
 export default async function handler(req: ApiRequest, res: ApiResponse) {
-  const result = await handleAiChat({
-    method: req.method,
-    authorization: headerValue(req.headers, 'authorization'),
-    body: req.body,
-    env: process.env
-  });
-  res.status(result.status).json(result.body);
+  try {
+    const result = await handleAiChat({
+      method: req.method,
+      authorization: headerValue(req.headers, 'authorization'),
+      body: req.body,
+      env: process.env
+    });
+    res.status(result.status).json(result.body);
+  } catch (error) {
+    console.error('AI chat handler failed', error instanceof Error ? error.message : 'error');
+    res.status(500).json({ error: 'server_error', message: 'שגיאה בשרת.' });
+  }
 }

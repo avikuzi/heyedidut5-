@@ -1,5 +1,5 @@
 import type { AiGroundingContext } from '../../types/ai';
-import { FEW_SHOTS_APPENDIX, SYSTEM_PROMPT } from './systemPrompt';
+import { FEW_SHOTS_APPENDIX, SYSTEM_PROMPT } from './systemPrompt.js';
 
 export type AiIntent = 'U1' | 'U2' | 'U3' | 'U4' | 'OUT';
 
