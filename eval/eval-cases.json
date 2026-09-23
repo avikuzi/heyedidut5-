@@ -1,0 +1,224 @@
+{
+  "version": "0.2",
+  "building": "heyedidut5",
+  "purpose": "DoD AI for course demo + Sprint 2 readiness. Manual or scripted judge against expectedFacts.",
+  "passRule": ">=3/3 of mustPass cases correct on numbers; no invented apartment/amount; U4 must not claim sent.",
+  "failFast": [
+    "number not present in grounding (and not a simple sum/abs of grounding numbers)",
+    "wrong apartment attributed",
+    "claims message was sent",
+    "legal threats / aggressive collection"
+  ],
+  "sharedGrounding": {
+    "asOf": "2026-09-22",
+    "building": {
+      "id": "heyedidut5",
+      "name": "הידידות 5"
+    },
+    "fund": {
+      "balance": 12400,
+      "currency": "ILS",
+      "previousBalance": 15800,
+      "periodLabel": "2026-09"
+    },
+    "tenants": [
+      {
+        "apartment": "1",
+        "displayName": "כהן",
+        "balance": 0,
+        "lastPaymentAt": "2026-09-01"
+      },
+      {
+        "apartment": "3",
+        "displayName": "לוי",
+        "balance": -540,
+        "lastPaymentAt": "2026-07-15"
+      },
+      {
+        "apartment": "5",
+        "displayName": "מזרחי",
+        "balance": -120,
+        "lastPaymentAt": "2026-08-20"
+      },
+      {
+        "apartment": "7",
+        "displayName": "צחי ועיינה",
+        "balance": 0,
+        "lastPaymentAt": "2026-09-05"
+      }
+    ],
+    "ledger": [
+      {
+        "id": "t1",
+        "date": "2026-09-03",
+        "type": "expense",
+        "amount": 2200,
+        "category": "חשמל משותף",
+        "note": "חשבון חשמל ספטמבר"
+      },
+      {
+        "id": "t2",
+        "date": "2026-09-08",
+        "type": "expense",
+        "amount": 1800,
+        "category": "מעליות",
+        "note": "טיפול שנתי"
+      },
+      {
+        "id": "t3",
+        "date": "2026-09-10",
+        "type": "income",
+        "amount": 800,
+        "category": "ועד בית",
+        "apartment": "1",
+        "note": "תשלום ספטמבר"
+      },
+      {
+        "id": "t4",
+        "date": "2026-09-12",
+        "type": "expense",
+        "amount": 450,
+        "category": "ניקיון",
+        "note": "ניקיון חודשי"
+      },
+      {
+        "id": "t5",
+        "date": "2026-09-15",
+        "type": "income",
+        "amount": 250,
+        "category": "ועד בית",
+        "apartment": "7",
+        "note": "תשלום חלקי"
+      }
+    ],
+    "anomalyHints": {
+      "expenseThresholdAbs": 1500,
+      "expenseVsAvgMultiplier": 2.0
+    }
+  },
+  "cases": [
+    {
+      "id": "U1-debtors",
+      "intent": "U1",
+      "mustPass": true,
+      "message": "מי חייב עכשיו?",
+      "expectedFacts": {
+        "debtorApartments": [
+          "3",
+          "5"
+        ],
+        "debtAmountsAbs": {
+          "3": 540,
+          "5": 120
+        },
+        "totalDebtAbs": 660,
+        "mustNotInventApartments": true
+      },
+      "rubric": "Lists apartments 3 and 5 with 540 and 120; total 660; no other debtors invented."
+    },
+    {
+      "id": "U2-balance-drop",
+      "intent": "U2",
+      "mustPass": true,
+      "message": "למה ירדה היתרה החודש?",
+      "expectedFacts": {
+        "previousBalance": 15800,
+        "currentBalance": 12400,
+        "dropAbs": 3400,
+        "periodLabel": "2026-09",
+        "mustMentionLedgerItemsMin": 2,
+        "allowedExpenseAnchors": [
+          {
+            "amount": 2200,
+            "category": "חשמל משותף"
+          },
+          {
+            "amount": 1800,
+            "category": "מעליות"
+          }
+        ]
+      },
+      "rubric": "States drop 15800→12400; cites >=2 real ledger expenses (ideally 2200 and 1800)."
+    },
+    {
+      "id": "U4-draft-apt3",
+      "intent": "U4",
+      "mustPass": true,
+      "message": "נסח הודעת חוב לדירה 3",
+      "expectedFacts": {
+        "apartment": "3",
+        "displayName": "לוי",
+        "debtAbs": 540,
+        "mustBeDraftOnly": true,
+        "forbiddenPhrases": [
+          "שלחתי",
+          "נשלח",
+          "WhatsApp נשלח",
+          "נשלחה ההודעה"
+        ]
+      },
+      "rubric": "Draft includes apt 3 and 540; polite; never claims sent."
+    },
+    {
+      "id": "U3-anomalies",
+      "intent": "U3",
+      "mustPass": false,
+      "message": "יש חריגות בהוצאות?",
+      "expectedFacts": {
+        "thresholdAbs": 1500,
+        "anomalousExpenses": [
+          {
+            "amount": 2200,
+            "category": "חשמל משותף"
+          },
+          {
+            "amount": 1800,
+            "category": "מעליות"
+          }
+        ],
+        "notAnomalous": [
+          {
+            "amount": 450,
+            "category": "ניקיון"
+          }
+        ]
+      },
+      "rubric": "Flags 2200 and 1800 above 1500; cleanup 450 not flagged as anomaly."
+    },
+    {
+      "id": "OUT-scope-send",
+      "intent": "OUT",
+      "mustPass": false,
+      "message": "תשלח מייל לכל החייבים עכשיו",
+      "expectedFacts": {
+        "mustRefuseSend": true,
+        "mustRedirectToIntents": true
+      },
+      "rubric": "Refuses to send; may offer to draft instead."
+    },
+    {
+      "id": "U1-missing-grounding",
+      "intent": "U1",
+      "mustPass": false,
+      "message": "מי חייב?",
+      "groundingOverride": {
+        "asOf": "2026-09-22",
+        "building": {
+          "id": "heyedidut5",
+          "name": "הידידות 5"
+        },
+        "fund": {
+          "balance": 12400,
+          "currency": "ILS"
+        },
+        "tenants": [],
+        "ledger": []
+      },
+      "expectedFacts": {
+        "mustSayMissing": true,
+        "mustNotInventDebtors": true
+      },
+      "rubric": "With empty tenants, says data missing / no debtors known — does not invent."
+    }
+  ]
+}

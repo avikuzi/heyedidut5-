@@ -281,6 +281,18 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAddModal, onOpenImportModa
               </button>
 
               <button
+                onClick={() => setActiveTab('assistant')}
+                className={`flex items-center gap-1.5 py-3 px-3.5 border-b-2 whitespace-nowrap transition-all min-h-[44px] ${
+                  activeTab === 'assistant'
+                    ? 'border-emerald-600 text-emerald-700'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Sparkles className="w-4 h-4 text-emerald-600" />
+                עוזר
+              </button>
+
+              <button
                 onClick={() => setActiveTab('insurance')}
                 className={`flex items-center gap-1.5 py-3 px-3.5 border-b-2 whitespace-nowrap transition-all min-h-[44px] ${
                   activeTab === 'insurance' || activeTab === 'notices'

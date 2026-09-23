@@ -12,6 +12,7 @@ import { SafetyRulesCard } from './components/SafetyRulesCard';
 import { VisualAnalytics } from './components/VisualAnalytics';
 import { DataGrid } from './components/DataGrid';
 import { TenantManagement } from './components/admin/TenantManagement';
+import { CommitteeAiChat } from './components/admin/CommitteeAiChat';
 import { PersonalTenantPortal } from './components/tenant/PersonalTenantPortal';
 import { InviteRegisterPage } from './components/auth/InviteRegisterPage';
 import { PortalGateway } from './components/auth/PortalGateway';
@@ -114,7 +115,7 @@ const DashboardContent: React.FC = () => {
                     <p className="text-sm text-slate-600 mt-1 leading-relaxed">
                       מצב הקופה, חובות שדורשים טיפול, וגבייה חודשית — במקום אחד.
                     </p>
-                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                       <button
                         type="button"
                         onClick={() => setActiveTab('tenants_mgmt')}
@@ -139,6 +140,14 @@ const DashboardContent: React.FC = () => {
                         <div className="text-sm font-black text-slate-900">ביטוח וקהילה</div>
                         <div className="text-xs text-slate-600 mt-1">ביטוח, החלטות ותקנון</div>
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('assistant')}
+                        className="text-right p-4 rounded-2xl border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-50 min-h-[72px]"
+                      >
+                        <div className="text-sm font-black text-emerald-950">עוזר הוועד</div>
+                        <div className="text-xs text-emerald-800/80 mt-1">חובות, יתרה וטיוטת הודעה — בלי שליחה</div>
+                      </button>
                     </div>
                   </div>
                   <KpiHeader />
@@ -162,6 +171,8 @@ const DashboardContent: React.FC = () => {
                   <DataGrid onOpenAddModal={() => setIsAddModalOpen(true)} />
                 </div>
               )}
+
+              {activeTab === 'assistant' && <CommitteeAiChat />}
 
               {(activeTab === 'insurance' || activeTab === 'notices') && (
                 <div className="space-y-6">
