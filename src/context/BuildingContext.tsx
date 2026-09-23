@@ -43,8 +43,10 @@ interface BuildingContextType {
   setSelectedProperty: (propNum: number) => void;
   activeMonth: string;
   setActiveMonth: (month: string) => void;
-  activeTab: 'overview' | 'residents' | 'tenants_mgmt' | 'financials' | 'insurance' | 'notices';
-  setActiveTab: (tab: 'overview' | 'residents' | 'tenants_mgmt' | 'financials' | 'insurance' | 'notices') => void;
+  activeTab: 'overview' | 'residents' | 'tenants_mgmt' | 'financials' | 'insurance' | 'notices' | 'assistant';
+  setActiveTab: (
+    tab: 'overview' | 'residents' | 'tenants_mgmt' | 'financials' | 'insurance' | 'notices' | 'assistant'
+  ) => void;
 
   properties: PropertyResident[];
   transactions: Transaction[];
@@ -165,7 +167,7 @@ export const BuildingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [selectedProperty, setSelectedProperty] = useState<number>(() => currentUser?.apartmentNumber || 2);
   const [activeMonth, setActiveMonth] = useState<string>('2026-09');
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'residents' | 'tenants_mgmt' | 'financials' | 'insurance' | 'notices'
+    'overview' | 'residents' | 'tenants_mgmt' | 'financials' | 'insurance' | 'notices' | 'assistant'
   >('overview');
 
   const [invitationTokens, setInvitationTokens] = useState<InvitationToken[]>(() => {

@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "seed:sql": "node scripts/generate-seed.mjs",
     "seed:users": "node --env-file=.env scripts/provision-demo-users.mjs",
-    "test:grounding": "node scripts/verify-grounding.mjs"
+    "test:grounding": "node scripts/verify-grounding.mjs",
+    "eval:ai": "node scripts/eval-ai.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",

@@ -70,7 +70,7 @@ Or create users in the Auth dashboard with User Metadata:
 - `transactions.amount` is always **positive**; `type` is `income` | `expense`.
 - RLS: committee sees everything; a tenant sees only their property, their income rows, and building notices.
 - `select public.build_ai_grounding('2026-09');` returns the v0.2 `AiGroundingContext` JSON (committee-only). Client helper: `buildAiGroundingContext()` in `src/lib/aiGrounding.ts`.
-- Sprint 2 can call that SQL from an Edge Function / `POST /api/ai/chat`. **No LLM in this sprint.**
+- Sprint 2 calls that SQL from `POST /api/ai/chat` for the signed-in committee session. See **Committee AI** below.
 
 Regenerate seed from in-app data:
 
@@ -86,16 +86,39 @@ node scripts/generate-seed.mjs
 2. עם פרויקט Supabase: מריצים את קובץ ה־migration ואז את `seed.sql`, ממלאים `.env.local`, ויוצרים משתמשי דמו (סקריפט או הדשבורד).
 3. ועד נכנס עם האימייל ב־`VITE_ADMIN_EMAIL` והסיסמה שמוגדרת ב־Auth. דייר נכנס עם אימייל/סיסמה, ורואה רק את הדירה שלו.
 4. יתרה שלילית בנכס = חוב. זה אותו כלל כמו בפרוד וכמו בחוזה ה־AI.
+5. עוזר הוועד (טאב «עוזר») זמין רק למנהל. בלי `OPENAI_API_KEY` בשרת הצ׳אט מחזיר שגיאה ולא ממציא מספרים. טיוטת הודעת חוב לא נשלחת לדייר.
 
 ---
 
-## Sprint 2 gaps (AI chat — out of this PR)
+## Committee AI (Sprint 2)
 
-- [ ] `POST /api/ai/chat` with server-built grounding (`build_ai_grounding`)
-- [ ] Full system prompt + few-shots (contract §5)
-- [ ] Eval JSON for U1/U2/U4
-- [ ] Committee-only chat UI + “נסח הודעת חוב”
-- [ ] Do not expose AI to the tenant portal
+Committee dashboard only (tab **עוזר**). Tenants never see the chat. The assistant answers from cashbox grounding (U1–U4) and only **drafts** debt notices — it does not send them.
+
+`POST /api/ai/chat` with `{ message, periodLabel? }`:
+
+- When Supabase is configured on the server, the handler ignores any client `grounding` and calls `build_ai_grounding` with the committee member's access token. A missing or non-admin session gets 401/403.
+- When `VITE_SUPABASE_*` / `SUPABASE_*` are empty, the app stays on localStorage. The dev API then accepts grounding built in the browser by `buildAiGroundingContext()` so the same Hebrew UI still works. Production should set Supabase so grounding is server-side.
+
+### Server env (never `VITE_`, never commit)
+
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `OPENAI_API_KEY` or `AI_API_KEY` | yes in production | OpenAI-compatible chat completions |
+| `OPENAI_MODEL` | no | default `gpt-4o-mini` |
+| `OPENAI_BASE_URL` | no | default `https://api.openai.com/v1` |
+| `SUPABASE_URL` | no | falls back to `VITE_SUPABASE_URL` |
+| `SUPABASE_ANON_KEY` | no | falls back to `VITE_SUPABASE_ANON_KEY` |
+| `AI_DRY_RUN` | no | `1` = deterministic answers for local/tests only. Leave unset in production. |
+
+Without an API key the route returns 503. It does not silently invent an answer.
+
+Offline checks (no key, no network):
+
+```bash
+npm run eval:ai
+```
+
+Contract text lives in `prompts/system-he.md`, `prompts/few-shots-he.md`, and `eval/eval-cases.json`.
 
 Insurance / charter / hazard modules stay local (out of cashbox MVP).
 
