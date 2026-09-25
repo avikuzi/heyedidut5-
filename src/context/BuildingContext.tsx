@@ -110,6 +110,30 @@ function readLocal<T>(suffix: string, fallback: T): T {
   }
 }
 
+function loadOfflineProperties(): PropertyResident[] {
+  // A configured Supabase client is the only source of property balances.
+  // localStorage from an earlier offline visit must not seed the dashboard.
+  if (isSupabaseConfigured()) return [];
+  try {
+    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_properties`);
+    if (saved) {
+      const parsed: PropertyResident[] = JSON.parse(saved);
+      return parsed.map((p) => {
+        const init = INITIAL_PROPERTIES.find((ip) => ip.propertyNumber === p.propertyNumber);
+        return {
+          ...p,
+          recurringDayText: p.recurringDayText || init?.recurringDayText,
+          currentBalance: p.propertyNumber === 7 ? 0 : p.currentBalance,
+          retroactiveShortfall: p.propertyNumber === 7 ? 0 : p.retroactiveShortfall
+        };
+      });
+    }
+    return INITIAL_PROPERTIES;
+  } catch {
+    return INITIAL_PROPERTIES;
+  }
+}
+
 export const BuildingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const supabaseEnabled = isSupabaseConfigured();
   const dataSource: 'supabase' | 'local' = supabaseEnabled ? 'supabase' : 'local';
@@ -206,27 +230,7 @@ export const BuildingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return readLocal('broadcast_notices', INITIAL_BROADCAST_NOTICES);
   });
 
-  const [properties, setProperties] = useState<PropertyResident[]>(() => {
-    if (supabaseEnabled) return [];
-    try {
-      const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_properties`);
-      if (saved) {
-        const parsed: PropertyResident[] = JSON.parse(saved);
-        return parsed.map((p) => {
-          const init = INITIAL_PROPERTIES.find((ip) => ip.propertyNumber === p.propertyNumber);
-          return {
-            ...p,
-            recurringDayText: p.recurringDayText || init?.recurringDayText,
-            currentBalance: p.propertyNumber === 7 ? 0 : p.currentBalance,
-            retroactiveShortfall: p.propertyNumber === 7 ? 0 : p.retroactiveShortfall
-          };
-        });
-      }
-      return INITIAL_PROPERTIES;
-    } catch {
-      return INITIAL_PROPERTIES;
-    }
-  });
+  const [properties, setProperties] = useState<PropertyResident[]>(() => loadOfflineProperties());
 
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     if (supabaseEnabled) return [];
@@ -286,6 +290,11 @@ export const BuildingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const applyRemoteCore = useCallback(
     (core: Awaited<ReturnType<typeof sb.fetchCoreData>>, profile: User | null) => {
       setProperties(core.properties);
+      try {
+        localStorage.removeItem(`${LOCAL_STORAGE_KEY}_properties`);
+      } catch {
+        /* ignore quota / private mode */
+      }
       setTransactions(core.transactions);
       setUsers(core.users);
       setInvitationTokens(core.invitations);
@@ -364,7 +373,11 @@ export const BuildingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     try {
       localStorage.setItem(`${LOCAL_STORAGE_KEY}_notices`, JSON.stringify(notices));
       localStorage.setItem(`${LOCAL_STORAGE_KEY}_hazards`, JSON.stringify(hazardReports));
-      if (supabaseEnabled) return;
+      if (supabaseEnabled) {
+        // Drop any offline property snapshot so it cannot be read back over live rows.
+        localStorage.removeItem(`${LOCAL_STORAGE_KEY}_properties`);
+        return;
+      }
       localStorage.setItem(`${LOCAL_STORAGE_KEY}_users`, JSON.stringify(users));
       localStorage.setItem(`${LOCAL_STORAGE_KEY}_currentUser`, JSON.stringify(currentUser));
       localStorage.setItem(`${LOCAL_STORAGE_KEY}_invitations`, JSON.stringify(invitationTokens));

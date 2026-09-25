@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { 
   CheckCircle2, 
   Clock, 
@@ -13,9 +13,14 @@ import {
   TrendingUp,
   AlertTriangle
 } from 'lucide-react';
+import { useBuilding } from '../context/BuildingContext';
+import { debtMonthsLine, openDebtProperties, outstandingDebtTotal } from '../lib/debtDisplay';
 import { formatCurrency } from '../services/financialAnalytics';
 
 export const MonthlyCollectionBreakdown: React.FC = () => {
+  const { properties } = useBuilding();
+  const openDebts = useMemo(() => openDebtProperties(properties), [properties]);
+  const openDebtTotal = useMemo(() => outstandingDebtTotal(properties), [properties]);
   const [copiedRef, setCopiedRef] = useState<string | null>(null);
 
   // 6 Incoming deposits recorded in August 2026 bank statement (total 1,705.00 NIS)
@@ -108,34 +113,6 @@ export const MonthlyCollectionBreakdown: React.FC = () => {
     }
   ];
 
-  // Pending dues & retro shortfalls to complete
-  const pendingDetails = [
-    {
-      propertyNumber: 7,
-      title: 'דירה 7 (פנטהאוז)',
-      residents: 'צחי ועיינה (דירה וחצי)',
-      amount: 180.00,
-      method: 'העברה בנקאית (אוצר החיל)',
-      statusNote: 'הפרש רטרו ממרץ: 180 ₪ (30 ₪ × 6 חודשים) • תעריף 405 ₪'
-    },
-    {
-      propertyNumber: 5,
-      title: 'דירה 5',
-      residents: 'אילנה',
-      amount: 120.00,
-      method: 'העברה בנקאית (הוראת קבע)',
-      statusNote: 'הפרש רטרו ממרץ: 120 ₪ (20 ₪ × 6 חודשים) • תעריף 270 ₪'
-    },
-    {
-      propertyNumber: 3,
-      title: 'דירה 3',
-      residents: 'אמיר ומירי חנוכה (שוכרים) | יניב',
-      amount: 540.00,
-      method: 'מזומן / אפליקציה לאבי הוועד',
-      statusNote: 'חוב עבור חודשים יולי ואוגוסט 2026 (540- ₪)'
-    }
-  ];
-
   const totalCollectedAugust = paidDetails.reduce((sum, p) => sum + p.amount, 0);
 
   const copyReference = (ref: string) => {
@@ -169,7 +146,7 @@ export const MonthlyCollectionBreakdown: React.FC = () => {
           </div>
           <div className="bg-rose-50 border border-rose-200 px-3 py-1.5 rounded-xl font-black text-rose-800 flex items-center gap-1">
             <AlertCircle className="w-3.5 h-3.5" />
-            חובות ורטרו: -840.00 ₪
+            חובות ורטרו: -{formatCurrency(openDebtTotal)}
           </div>
         </div>
       </div>
@@ -268,26 +245,42 @@ export const MonthlyCollectionBreakdown: React.FC = () => {
             </h3>
 
             <div className="space-y-2">
-              {pendingDetails.map((pend, idx) => (
-                <div key={idx} className="p-3 rounded-2xl border border-rose-200 bg-rose-50/40 text-xs flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <span className="font-black text-slate-900 block">
-                      {pend.title} • {pend.residents}
-                    </span>
-                    <span className="text-[11px] text-slate-600 font-medium block">
-                      {pend.statusNote}
-                    </span>
-                  </div>
-                  <div className="text-left shrink-0">
-                    <span className="font-black text-rose-700 text-sm block">
-                      -{formatCurrency(pend.amount)}
-                    </span>
-                    <span className="text-[10px] text-slate-500 font-medium">
-                      {pend.method}
-                    </span>
-                  </div>
-                </div>
-              ))}
+              {openDebts.length === 0 ? (
+                <p className="text-xs text-slate-500">אין חובות פתוחים לפי יתרות הנכסים.</p>
+              ) : (
+                openDebts.map((property) => {
+                  const monthsLine = debtMonthsLine(property);
+                  return (
+                    <div key={property.id} className="p-3 rounded-2xl border border-rose-200 bg-rose-50/40 text-xs flex items-center justify-between gap-3">
+                      <div className="space-y-0.5">
+                        <span className="font-black text-slate-900 block">
+                          {property.title} • {property.residents}
+                        </span>
+                        {property.balanceNote && (
+                          <span className="text-[11px] text-slate-600 font-medium block">
+                            {property.balanceNote}
+                          </span>
+                        )}
+                        {monthsLine && (
+                          <span className="text-[11px] text-slate-500 font-medium block">
+                            {monthsLine}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-left shrink-0">
+                        <span className="font-black text-rose-700 text-sm block">
+                          -{formatCurrency(Math.abs(property.currentBalance))}
+                        </span>
+                        {property.paymentMethod && (
+                          <span className="text-[10px] text-slate-500 font-medium">
+                            {property.paymentMethod}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
 
