@@ -427,6 +427,50 @@ export function buildLlmMessages(grounding: AiGroundingContext, message: string)
   ];
 }
 
+/**
+ * Gemini's OpenAI-compatible endpoint bills thought tokens against max_tokens
+ * (native max_output_tokens). gemini-3.8-flash thinks at medium by default, so
+ * the old 900 cap stopped visible U2/U3 answers mid-number. 8192 is a ceiling
+ * (above a ~4000 floor), not a target: low thinking plus a full committee
+ * reply fit, and the model still stops when the answer is done.
+ */
+export const COMMITTEE_CHAT_MAX_TOKENS = 8192;
+
+const GEMINI_OPENAI_HOST = 'generativelanguage.googleapis.com';
+
+/**
+ * Smallest thinking level gemini-3.8-flash actually honors (low | medium | high).
+ * Thinking cannot be turned off on Gemini 3. Plain OpenAI chat models reject
+ * reasoning_effort, so it is sent only when the model or base URL is Gemini.
+ */
+export function reasoningEffortForModel(model: string, baseUrl?: string): 'low' | undefined {
+  if (model.toLowerCase().includes('gemini')) return 'low';
+  const base = (baseUrl || '').trim();
+  if (!base) return undefined;
+  try {
+    const host = new URL(base).hostname.toLowerCase();
+    if (host === GEMINI_OPENAI_HOST || host.endsWith(`.${GEMINI_OPENAI_HOST}`)) return 'low';
+  } catch {
+    if (base.toLowerCase().includes(GEMINI_OPENAI_HOST)) return 'low';
+  }
+  return undefined;
+}
+
+export function buildChatCompletionBody(
+  model: string,
+  messages: ChatMessage[],
+  baseUrl?: string
+): Record<string, unknown> {
+  const reasoningEffort = reasoningEffortForModel(model, baseUrl);
+  return {
+    model,
+    temperature: 0.2,
+    max_tokens: COMMITTEE_CHAT_MAX_TOKENS,
+    ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
+    messages
+  };
+}
+
 export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 
 export async function completeCommitteeChat(options: {
@@ -448,18 +492,16 @@ export async function completeCommitteeChat(options: {
 
   const fetchImpl = options.fetchImpl || fetch;
   const base = (options.baseUrl || 'https://api.openai.com/v1').replace(/\/$/, '');
+  const model = options.model || 'gpt-4o-mini';
   const response = await fetchImpl(`${base}/chat/completions`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${options.apiKey}`,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({
-      model: options.model || 'gpt-4o-mini',
-      temperature: 0.2,
-      max_tokens: 900,
-      messages: buildLlmMessages(options.grounding, options.message)
-    }),
+    body: JSON.stringify(
+      buildChatCompletionBody(model, buildLlmMessages(options.grounding, options.message), base)
+    ),
     signal: AbortSignal.timeout(25000)
   });
 
@@ -467,9 +509,13 @@ export async function completeCommitteeChat(options: {
     throw new Error(`llm_http_${response.status}`);
   }
   const payload = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
+    choices?: Array<{ finish_reason?: string; message?: { content?: string | null } }>;
   };
-  const reply = payload.choices?.[0]?.message?.content;
+  const choice = payload.choices?.[0];
+  if (choice?.finish_reason === 'length') {
+    console.warn(`AI chat truncated finish_reason=length model=${model}`);
+  }
+  const reply = choice?.message?.content;
   if (typeof reply !== 'string' || !reply.trim()) {
     throw new Error('llm_empty');
   }

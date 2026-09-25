@@ -5,9 +5,12 @@ import { handleAiChat } from '../../server/aiChatHandler';
 import {
   answerFromGrounding,
   apartmentsMentionedInReply,
+  buildChatCompletionBody,
   buildLlmMessages,
+  COMMITTEE_CHAT_MAX_TOKENS,
   completeCommitteeChat,
   judgeReply,
+  reasoningEffortForModel,
   sanitizeGrounding,
   textHasAmount
 } from './committeeChat';
@@ -156,9 +159,13 @@ async function runHandlerChecks(grounding: AiGroundingContext): Promise<void> {
     fetchImpl: async (url, init) => {
       fetchCalled = true;
       const body = JSON.parse(String(init?.body || '{}')) as {
+        max_tokens?: number;
+        reasoning_effort?: string;
         messages: Array<{ role: string; content: string }>;
       };
       assert(url.endsWith('/chat/completions'), 'openai url');
+      assert(body.max_tokens === COMMITTEE_CHAT_MAX_TOKENS, 'token cap leaves room for a full reply');
+      assert(body.reasoning_effort === undefined, 'classic chat models omit reasoning_effort');
       assert(body.messages[0]?.role === 'system', 'system role');
       assert(body.messages[0].content.includes('הידידות 5'), 'system prompt');
       assert(body.messages[0].content.includes('U4'), 'intents in prompt');
@@ -178,6 +185,133 @@ async function runHandlerChecks(grounding: AiGroundingContext): Promise<void> {
   const messages = buildLlmMessages(grounding, 'נסח הודעת חוב לדירה 3');
   assert(messages[0].content.includes(SYSTEM_PROMPT.slice(0, 40)), 'prompt embedded');
   assert(!messages.some((message) => message.content.includes('sk-')), 'no secrets in prompt');
+}
+
+async function runCompletionLimitChecks(grounding: AiGroundingContext): Promise<void> {
+  const openaiBase = 'https://api.openai.com/v1';
+  const geminiBase = 'https://generativelanguage.googleapis.com/v1beta/openai';
+  assert(COMMITTEE_CHAT_MAX_TOKENS >= 4000, 'token cap is a substantial raise');
+  assert(reasoningEffortForModel('gemini-3.8-flash') === 'low', 'gemini model uses low reasoning effort');
+  assert(reasoningEffortForModel('gpt-4o-mini') === undefined, 'gpt-4o-mini has no reasoning effort');
+  assert(reasoningEffortForModel('gpt-4o-mini', openaiBase) === undefined, 'openai base keeps reasoning_effort off');
+  assert(reasoningEffortForModel('gpt-4.1', openaiBase) === undefined, 'gpt-4.1 has no reasoning effort');
+  assert(reasoningEffortForModel('gpt-4o-mini', geminiBase) === 'low', 'gemini base url opts in');
+
+  const geminiBody = buildChatCompletionBody('gemini-3.8-flash', [{ role: 'user', content: 'מה היתרה?' }], geminiBase);
+  assert(geminiBody.max_tokens === COMMITTEE_CHAT_MAX_TOKENS, 'gemini cap');
+  assert(geminiBody.reasoning_effort === 'low', 'gemini request sets reasoning_effort');
+  assert(geminiBody.temperature === 0.2, 'temperature unchanged');
+  const plainBody = buildChatCompletionBody('gpt-4o-mini', [{ role: 'user', content: 'מה היתרה?' }], openaiBase);
+  assert(plainBody.max_tokens === COMMITTEE_CHAT_MAX_TOKENS, 'plain models still get the raised cap');
+  assert(!('reasoning_effort' in plainBody), 'plain OpenAI body omits reasoning_effort');
+  const geminiHostPlainModel = buildChatCompletionBody('gpt-4o-mini', [{ role: 'user', content: 'מה היתרה?' }], geminiBase);
+  assert(geminiHostPlainModel.reasoning_effort === 'low', 'gemini host accepts reasoning_effort');
+
+  await completeCommitteeChat({
+    message: 'מה היתרה?',
+    grounding,
+    apiKey: 'sk-test',
+    model: 'gpt-4o-mini',
+    baseUrl: openaiBase,
+    fetchImpl: async (_url, init) => {
+      const body = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
+      assert(body.model === 'gpt-4o-mini', 'plain model name');
+      assert(body.max_tokens === COMMITTEE_CHAT_MAX_TOKENS, 'plain model gets the raised cap');
+      assert(!('reasoning_effort' in body), 'live openai request omits reasoning_effort');
+      return new Response(
+        JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: 'היתרה תקינה.' } }] }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+  });
+
+  const warnings: string[] = [];
+  const originalWarn = console.warn;
+  console.warn = (...args: unknown[]) => {
+    warnings.push(args.map((arg) => (typeof arg === 'string' ? arg : JSON.stringify(arg))).join(' '));
+  };
+
+  try {
+    const partial = 'היתרה ירדה ל־**58';
+    const truncated = await handleAiChat(
+      {
+        method: 'POST',
+        body: { message: 'למה היתרה ירדה?', grounding },
+        env: {
+          AI_API_KEY: 'sk-test',
+          OPENAI_MODEL: 'gemini-3.8-flash',
+          OPENAI_BASE_URL: 'https://generativelanguage.googleapis.com/v1beta/openai',
+          AI_DRY_RUN: '0'
+        }
+      },
+      {
+        fetchImpl: async (url, init) => {
+          assert(String(url).includes('/chat/completions'), 'completions url');
+          const body = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
+          assert(body.model === 'gemini-3.8-flash', 'gemini model');
+          assert(body.max_tokens === COMMITTEE_CHAT_MAX_TOKENS, 'handler sends raised cap');
+          assert(body.reasoning_effort === 'low', 'handler sends reasoning_effort');
+          assert(!JSON.stringify(body).includes('sk-test'), 'request body has no api key');
+          return new Response(
+            JSON.stringify({
+              choices: [{ finish_reason: 'length', message: { content: partial } }]
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+    );
+    assert(truncated.status === 200, 'partial reply is still returned');
+    assert(truncated.body.reply === partial, 'truncated text is not rewritten');
+    assert(
+      warnings.some((line) => line.includes('finish_reason=length') && line.includes('model=gemini-3.8-flash')),
+      'length limit logged'
+    );
+    assert(
+      warnings.every((line) => !line.includes(partial) && !line.includes('sk-test') && !line.includes('למה היתרה')),
+      'length log has no reply, question, or secret'
+    );
+
+    warnings.length = 0;
+    let emptyFailed = false;
+    try {
+      await completeCommitteeChat({
+        message: 'מה היתרה?',
+        grounding,
+        apiKey: 'sk-test',
+        model: 'gemini-3.8-flash',
+        fetchImpl: async () =>
+          new Response(
+            JSON.stringify({ choices: [{ finish_reason: 'length', message: { content: '' } }] }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          )
+      });
+    } catch (error) {
+      emptyFailed = error instanceof Error && error.message === 'llm_empty';
+    }
+    assert(emptyFailed, 'empty length-limited completion still fails');
+    assert(
+      warnings.some((line) => line.includes('finish_reason=length')),
+      'empty truncation is logged before the error'
+    );
+
+    warnings.length = 0;
+    const stopped = await completeCommitteeChat({
+      message: 'מה היתרה?',
+      grounding,
+      apiKey: 'sk-test',
+      model: 'gpt-4o-mini',
+      fetchImpl: async () =>
+        new Response(
+          JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: 'היתרה 900.67 ₪.' } }] }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+    });
+    assert(stopped.reply.includes('900.67'), 'complete reply returned');
+    assert(warnings.length === 0, 'finish_reason stop is not logged as truncation');
+  } finally {
+    console.warn = originalWarn;
+  }
 }
 
 function runPromptDocCheck(): void {
@@ -201,6 +335,7 @@ export async function runAiChecks(): Promise<number> {
     runPromptDocCheck();
     runPrivacyChecks(grounding);
     await runHandlerChecks(grounding);
+    await runCompletionLimitChecks(grounding);
     console.log('PASS handler, privacy, and live-request shape');
   } catch (error) {
     console.error('FAIL checks', error instanceof Error ? error.message : error);
