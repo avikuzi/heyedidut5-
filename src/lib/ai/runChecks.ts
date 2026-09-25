@@ -188,16 +188,42 @@ async function runHandlerChecks(grounding: AiGroundingContext): Promise<void> {
 }
 
 async function runCompletionLimitChecks(grounding: AiGroundingContext): Promise<void> {
-  assert(reasoningEffortForModel('gemini-3.8-flash') === 'low', 'gemini uses low reasoning effort');
+  const openaiBase = 'https://api.openai.com/v1';
+  const geminiBase = 'https://generativelanguage.googleapis.com/v1beta/openai';
+  assert(COMMITTEE_CHAT_MAX_TOKENS >= 4000, 'token cap is a substantial raise');
+  assert(reasoningEffortForModel('gemini-3.8-flash') === 'low', 'gemini model uses low reasoning effort');
   assert(reasoningEffortForModel('gpt-4o-mini') === undefined, 'gpt-4o-mini has no reasoning effort');
-  assert(reasoningEffortForModel('gpt-4.1') === undefined, 'gpt-4.1 has no reasoning effort');
+  assert(reasoningEffortForModel('gpt-4o-mini', openaiBase) === undefined, 'openai base keeps reasoning_effort off');
+  assert(reasoningEffortForModel('gpt-4.1', openaiBase) === undefined, 'gpt-4.1 has no reasoning effort');
+  assert(reasoningEffortForModel('gpt-4o-mini', geminiBase) === 'low', 'gemini base url opts in');
 
-  const geminiBody = buildChatCompletionBody('gemini-3.8-flash', [{ role: 'user', content: 'מה היתרה?' }]);
+  const geminiBody = buildChatCompletionBody('gemini-3.8-flash', [{ role: 'user', content: 'מה היתרה?' }], geminiBase);
   assert(geminiBody.max_tokens === COMMITTEE_CHAT_MAX_TOKENS, 'gemini cap');
   assert(geminiBody.reasoning_effort === 'low', 'gemini request sets reasoning_effort');
   assert(geminiBody.temperature === 0.2, 'temperature unchanged');
-  const plainBody = buildChatCompletionBody('gpt-4o-mini', [{ role: 'user', content: 'מה היתרה?' }]);
+  const plainBody = buildChatCompletionBody('gpt-4o-mini', [{ role: 'user', content: 'מה היתרה?' }], openaiBase);
+  assert(plainBody.max_tokens === COMMITTEE_CHAT_MAX_TOKENS, 'plain models still get the raised cap');
   assert(!('reasoning_effort' in plainBody), 'plain OpenAI body omits reasoning_effort');
+  const geminiHostPlainModel = buildChatCompletionBody('gpt-4o-mini', [{ role: 'user', content: 'מה היתרה?' }], geminiBase);
+  assert(geminiHostPlainModel.reasoning_effort === 'low', 'gemini host accepts reasoning_effort');
+
+  await completeCommitteeChat({
+    message: 'מה היתרה?',
+    grounding,
+    apiKey: 'sk-test',
+    model: 'gpt-4o-mini',
+    baseUrl: openaiBase,
+    fetchImpl: async (_url, init) => {
+      const body = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
+      assert(body.model === 'gpt-4o-mini', 'plain model name');
+      assert(body.max_tokens === COMMITTEE_CHAT_MAX_TOKENS, 'plain model gets the raised cap');
+      assert(!('reasoning_effort' in body), 'live openai request omits reasoning_effort');
+      return new Response(
+        JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: 'היתרה תקינה.' } }] }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+  });
 
   const warnings: string[] = [];
   const originalWarn = console.warn;

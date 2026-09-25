@@ -430,23 +430,38 @@ export function buildLlmMessages(grounding: AiGroundingContext, message: string)
 /**
  * Gemini's OpenAI-compatible endpoint bills thought tokens against max_tokens
  * (native max_output_tokens). gemini-3.8-flash thinks at medium by default, so
- * the old 900 cap stopped visible U2/U3 answers mid-number. 8192 is a ceiling,
- * not a target: low thinking plus a full committee reply fit, and the model
- * still stops when the answer is done.
+ * the old 900 cap stopped visible U2/U3 answers mid-number. 8192 is a ceiling
+ * (above a ~4000 floor), not a target: low thinking plus a full committee
+ * reply fit, and the model still stops when the answer is done.
  */
 export const COMMITTEE_CHAT_MAX_TOKENS = 8192;
 
+const GEMINI_OPENAI_HOST = 'generativelanguage.googleapis.com';
+
 /**
  * Smallest thinking level gemini-3.8-flash actually honors (low | medium | high).
- * Thinking cannot be turned off on Gemini 3. Classic OpenAI chat models reject
- * reasoning_effort, so the field is omitted for them.
+ * Thinking cannot be turned off on Gemini 3. Plain OpenAI chat models reject
+ * reasoning_effort, so it is sent only when the model or base URL is Gemini.
  */
-export function reasoningEffortForModel(model: string): 'low' | undefined {
-  return model.toLowerCase().includes('gemini') ? 'low' : undefined;
+export function reasoningEffortForModel(model: string, baseUrl?: string): 'low' | undefined {
+  if (model.toLowerCase().includes('gemini')) return 'low';
+  const base = (baseUrl || '').trim();
+  if (!base) return undefined;
+  try {
+    const host = new URL(base).hostname.toLowerCase();
+    if (host === GEMINI_OPENAI_HOST || host.endsWith(`.${GEMINI_OPENAI_HOST}`)) return 'low';
+  } catch {
+    if (base.toLowerCase().includes(GEMINI_OPENAI_HOST)) return 'low';
+  }
+  return undefined;
 }
 
-export function buildChatCompletionBody(model: string, messages: ChatMessage[]): Record<string, unknown> {
-  const reasoningEffort = reasoningEffortForModel(model);
+export function buildChatCompletionBody(
+  model: string,
+  messages: ChatMessage[],
+  baseUrl?: string
+): Record<string, unknown> {
+  const reasoningEffort = reasoningEffortForModel(model, baseUrl);
   return {
     model,
     temperature: 0.2,
@@ -484,7 +499,9 @@ export async function completeCommitteeChat(options: {
       Authorization: `Bearer ${options.apiKey}`,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify(buildChatCompletionBody(model, buildLlmMessages(options.grounding, options.message))),
+    body: JSON.stringify(
+      buildChatCompletionBody(model, buildLlmMessages(options.grounding, options.message), base)
+    ),
     signal: AbortSignal.timeout(25000)
   });
 
