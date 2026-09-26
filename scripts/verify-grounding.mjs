@@ -15,11 +15,15 @@ function buildAiGroundingContext(properties, transactions, periodLabel = '2026-0
     },
     tenants: properties.map((p) => {
       const lastIncome = sorted.find((t) => t.type === 'income' && t.apartmentNumber === p.propertyNumber);
+      const paymentMethod = typeof p.paymentMethod === 'string' ? p.paymentMethod.trim() : '';
+      const balanceNote = typeof p.balanceNote === 'string' ? p.balanceNote.trim() : '';
       return {
         apartment: String(p.propertyNumber),
         displayName: p.residents,
         balance: p.currentBalance,
-        lastPaymentAt: lastIncome?.date
+        lastPaymentAt: lastIncome?.date,
+        ...(paymentMethod ? { paymentMethod } : {}),
+        ...(balanceNote ? { balanceNote } : {})
       };
     }),
     ledger: sorted.map((t) => ({
@@ -35,8 +39,16 @@ function buildAiGroundingContext(properties, transactions, periodLabel = '2026-0
 }
 
 const properties = [
-  { propertyNumber: 3, residents: 'אמיר ומירי חנוכה', currentBalance: -540 },
-  { propertyNumber: 5, residents: 'אילנה', currentBalance: -120 },
+  {
+    propertyNumber: 3,
+    residents: 'אמיר ומירי חנוכה',
+    currentBalance: -540,
+    paymentMethod: 'מזומן / אפליקציה לאבי',
+    balanceNote: 'משלם במזומן. את התשלום האחרון אפשר לבדוק בהתכתבות הוואטסאפ.',
+    phone: '050-0000000',
+    email: 'apt3@example.com'
+  },
+  { propertyNumber: 5, residents: 'אילנה', currentBalance: -120, paymentMethod: '', balanceNote: '' },
   { propertyNumber: 7, residents: 'צחי ועיינה', currentBalance: 0 }
 ];
 const transactions = [
@@ -54,6 +66,14 @@ if (debts[0].apartment !== '3' || debts[0].balance !== -540) throw new Error('ap
 if (ctx.tenants.find((t) => t.apartment === '7').lastPaymentAt !== '2026-08-30') throw new Error('lastPaymentAt');
 if (ctx.ledger.some((l) => l.amount < 0)) throw new Error('ledger amounts must be positive');
 if (ctx.ledger[0].note !== 'משכורת') throw new Error('note ← description');
+const apt3 = ctx.tenants.find((t) => t.apartment === '3');
+if (apt3.paymentMethod !== 'מזומן / אפליקציה לאבי') throw new Error('paymentMethod');
+if (!apt3.balanceNote.includes('התכתבות הוואטסאפ')) throw new Error('balanceNote');
+if (ctx.tenants.find((t) => t.apartment === '5').paymentMethod) throw new Error('blank paymentMethod omitted');
+const dumped = JSON.stringify(ctx);
+if (dumped.includes('050-0000000') || dumped.includes('apt3@example.com')) {
+  throw new Error('phone or email must not enter grounding');
+}
 console.log('grounding contract checks passed', {
   debts: debts.map((d) => `${d.apartment}:${d.balance}`),
   fund: ctx.fund.balance,

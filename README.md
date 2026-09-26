@@ -30,6 +30,7 @@ The header badge shows `localStorage`.
 3. In **Authentication → URL configuration**, set Site URL to your app origin (`http://localhost:3000` and later `https://heyedidut5.vercel.app`).
 4. SQL Editor: run in order:
    - `supabase/migrations/20260916120000_init_vaad.sql` (tables, RLS, `build_ai_grounding`)
+   - `supabase/migrations/20260926120000_ai_grounding_payment_note.sql` (**must be applied** so grounding includes `payment_method` / `balance_note`)
    - `supabase/seed.sql` (building הידידות 5, 9 properties, 106 ledger rows, demo invites)
 5. Copy Project URL + **anon** key into `.env.local`:
 

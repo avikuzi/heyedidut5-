@@ -19,6 +19,10 @@ export type AiGroundingContext = {
     /** Negative = debt (same as properties.currentBalance in prod). */
     balance: number;
     lastPaymentAt?: string;
+    /** properties.payment_method. Omitted when empty so older payloads still parse. */
+    paymentMethod?: string;
+    /** properties.balance_note. Omitted when empty. */
+    balanceNote?: string;
   }>;
   ledger: Array<{
     id: string;

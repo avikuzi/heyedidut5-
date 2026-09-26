@@ -32,7 +32,9 @@
         "apartment": "3",
         "displayName": "לוי",
         "balance": -540,
-        "lastPaymentAt": "2026-07-15"
+        "lastPaymentAt": "2026-07-15",
+        "paymentMethod": "מזומן",
+        "balanceNote": "משלם במזומן. את התשלום האחרון אפשר לבדוק בהתכתבות הוואטסאפ."
       },
       {
         "apartment": "5",

@@ -35,6 +35,8 @@
 | `tenants[].displayName` | `properties.residents` | |
 | `tenants[].balance` | `properties.currentBalance` | **שלילי = חוב** (מאומת בפרוד) |
 | `tenants[].lastPaymentAt` | **derived** | תאריך tx `income` אחרון לפי `apartmentNumber` |
+| `tenants[].paymentMethod` | `properties.payment_method` | אופציונלי; ריק לא נכנס ל־JSON |
+| `tenants[].balanceNote` | `properties.balance_note` | אופציונלי; טלפון/אימייל לא נכללים |
 | `ledger[]` | `transactions` / `_tx` | `note`←`description`, `apartment`←`apartmentNumber`; amount>0; type income\|expense |
 | `fund.balance` | יתרה רצה / סכימת tx | |
 | `fund.currency` | קבוע `"ILS"` | לא בשדה בפרוד |
@@ -64,6 +66,8 @@ type AiGroundingContext = {
     displayName: string;
     balance: number;            // שלילי = חוב (כמו currentBalance בפרוד)
     lastPaymentAt?: string;     // derived מ־tx income
+    paymentMethod?: string;     // properties.payment_method
+    balanceNote?: string;       // properties.balance_note
   }>;
   ledger: Array<{
     id: string;

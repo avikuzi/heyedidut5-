@@ -1,6 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import type { AiGroundingContext } from '../../types/ai';
+import type { PropertyResident } from '../../types';
+import { AssistantMarkdown } from '../../components/admin/AssistantMarkdown';
+import { markdownToPlainText } from '../assistantMarkdown';
+import { buildAiGroundingContext } from '../mappers';
 import { handleAiChat } from '../../server/aiChatHandler';
 import {
   answerFromGrounding,
@@ -83,6 +89,9 @@ function runPrivacyChecks(grounding: AiGroundingContext): void {
   assert(draft.includes('טיוטה'), 'draft label');
   assert(draft.includes('לא נשלחה'), 'explicitly not sent');
   assert(!draft.includes('מזרחי'), 'draft does not name another tenant');
+  assert(draft.includes('מזומן'), 'draft uses payment method');
+  assert(draft.includes('התכתבות הוואטסאפ'), 'draft uses balance note');
+  assert(!draft.includes('050-'), 'draft has no phone');
 }
 
 async function runHandlerChecks(grounding: AiGroundingContext): Promise<void> {
@@ -314,6 +323,147 @@ async function runCompletionLimitChecks(grounding: AiGroundingContext): Promise<
   }
 }
 
+function runGroundingFieldChecks(grounding: AiGroundingContext): void {
+  const apt3 = grounding.tenants.find((tenant) => tenant.apartment === '3');
+  assert(apt3?.paymentMethod === 'מזומן', 'sanitized paymentMethod');
+  assert(apt3?.balanceNote?.includes('התכתבות הוואטסאפ'), 'sanitized balanceNote');
+
+  const withSecrets = {
+    ...grounding,
+    tenants: grounding.tenants.map((tenant) =>
+      tenant.apartment === '3'
+        ? {
+            ...tenant,
+            phone: '050-1234567',
+            email: 'secret@example.com',
+            notes: 'private notes should not pass'
+          }
+        : tenant
+    )
+  };
+  const cleaned = sanitizeGrounding(withSecrets);
+  assert(cleaned, 'grounding with extra keys still sanitizes');
+  const serialized = JSON.stringify(cleaned);
+  assert(serialized.includes('מזומן'), 'payment method kept');
+  assert(serialized.includes('התכתבות הוואטסאפ'), 'balance note kept');
+  assert(!serialized.includes('050-1234567'), 'phone dropped');
+  assert(!serialized.includes('secret@example.com'), 'email dropped');
+  assert(!serialized.includes('private notes should not pass'), 'free-form notes dropped');
+
+  const legacy = sanitizeGrounding({
+    ...grounding,
+    tenants: grounding.tenants.map((tenant) => {
+      const { paymentMethod: _payment, balanceNote: _note, ...rest } = tenant;
+      return { ...rest, paymentMethod: '', balanceNote: null };
+    })
+  });
+  assert(legacy, 'missing payment fields still sanitize');
+  assert(
+    legacy?.tenants.every((tenant) => tenant.paymentMethod === undefined && tenant.balanceNote === undefined),
+    'blank payment method and null note are omitted'
+  );
+
+  const mapped = buildAiGroundingContext(
+    [
+      {
+        id: 'p3',
+        propertyNumber: 3,
+        residents: 'אמיר ומירי חנוכה',
+        currentBalance: -540,
+        paymentMethod: 'מזומן / אפליקציה לאבי',
+        balanceNote: 'משלם במזומן. את התשלום האחרון אפשר לבדוק בהתכתבות הוואטסאפ.',
+        phone: '050-9999999',
+        email: 'apt3@example.com'
+      } as PropertyResident,
+      {
+        id: 'p1',
+        propertyNumber: 1,
+        residents: 'כהן',
+        currentBalance: 0,
+        paymentMethod: '   ',
+        balanceNote: ''
+      } as PropertyResident
+    ],
+    [],
+    '2026-09'
+  );
+  const mappedJson = JSON.stringify(mapped);
+  const mappedApt3 = mapped.tenants.find((tenant) => tenant.apartment === '3');
+  const mappedApt1 = mapped.tenants.find((tenant) => tenant.apartment === '1');
+  assert(mappedApt3?.paymentMethod === 'מזומן / אפליקציה לאבי', 'client mapper payment method');
+  assert(mappedApt3?.balanceNote?.includes('וואטסאפ'), 'client mapper balance note');
+  assert(mappedApt1?.paymentMethod === undefined, 'blank payment method omitted');
+  assert(mappedApt1?.balanceNote === undefined, 'blank balance note omitted');
+  assert(!mappedJson.includes('050-9999999'), 'mapper does not copy phone');
+  assert(!mappedJson.includes('apt3@example.com'), 'mapper does not copy email');
+
+  const sql = readFileSync(
+    resolve(process.cwd(), 'supabase/migrations/20260926120000_ai_grounding_payment_note.sql'),
+    'utf8'
+  );
+  assert(/create or replace function public\.build_ai_grounding/i.test(sql), 'migration replaces grounding function');
+  assert(sql.includes('p.payment_method'), 'migration reads payment_method');
+  assert(sql.includes('p.balance_note'), 'migration reads balance_note');
+  assert(sql.includes("'paymentMethod'"), 'migration emits paymentMethod');
+  assert(sql.includes("'balanceNote'"), 'migration emits balanceNote');
+  assert(sql.includes('is_committee()'), 'committee gate stays');
+  assert(!/p\.phone|p\.email/.test(sql), 'migration does not select phone or email');
+}
+
+function runMarkdownChecks(): void {
+  const sample = [
+    '**5,600 ₪** וגם *הערה*',
+    '',
+    '**הוצאות עיקריות:**',
+    '- חשמל משותף',
+    '* מעליות',
+    '',
+    '1. ניקיון 450 ₪',
+    '2. ביטוח',
+    '',
+    '***',
+    '---',
+    '',
+    '<script>alert(1)</script>',
+    '<img src=x onerror=alert(1)>',
+    '<a href="javascript:alert(1)">לחצו</a>'
+  ].join('\n');
+
+  const html = renderToStaticMarkup(React.createElement(AssistantMarkdown, { text: sample }));
+  assert(html.includes('dir="rtl"'), 'assistant markdown stays rtl');
+  assert(html.includes('<strong'), 'bold renders as an element');
+  assert(html.includes('5,600 ₪'), 'shekel amount stays intact');
+  assert(html.includes('<em'), 'italic renders as an element');
+  assert(html.includes('<ul'), 'bullets render as a list');
+  assert(html.includes('<ol'), 'numbers render as a list');
+  assert(html.includes('<hr'), 'horizontal rule renders');
+  assert(!html.includes('**'), 'bold markers are not shown');
+  assert(!html.includes('<script'), 'script tag is not raw HTML');
+  assert(!html.includes('<img'), 'img tag is not raw HTML');
+  assert(!html.includes('<a '), 'anchor tag is not raw HTML');
+  assert(html.includes('&lt;script&gt;'), 'script text is escaped');
+  assert(html.includes('&lt;img'), 'img text is escaped');
+  assert(html.includes('text-right'), 'lists stay right aligned');
+
+  const plain = markdownToPlainText(sample);
+  assert(plain.includes('5,600 ₪'), 'copy keeps the amount');
+  assert(plain.includes('הוצאות עיקריות:'), 'copy keeps bold text');
+  assert(plain.includes('• חשמל משותף'), 'copy keeps bullet text');
+  assert(plain.includes('• מעליות'), 'copy keeps star-list text');
+  assert(plain.includes('1. ניקיון 450 ₪'), 'copy keeps numbered text');
+  assert(!plain.includes('**'), 'copy drops bold markers');
+  assert(!plain.includes('***'), 'copy drops thematic break');
+  assert(!/^---$/m.test(plain), 'copy drops rule lines');
+  assert(!plain.includes('- חשמל'), 'copy drops markdown bullet markers');
+  assert(plain.includes('<script>alert(1)</script>'), 'copy stays plain text, not HTML');
+
+  const source = readFileSync(resolve(process.cwd(), 'src/components/admin/AssistantMarkdown.tsx'), 'utf8');
+  assert(!source.includes('dangerouslySetInnerHTML'), 'renderer does not use dangerouslySetInnerHTML');
+  const chat = readFileSync(resolve(process.cwd(), 'src/components/admin/CommitteeAiChat.tsx'), 'utf8');
+  assert(chat.includes('markdownToPlainText'), 'draft copy strips markdown');
+  assert(!chat.includes('dangerouslySetInnerHTML'), 'chat does not inject HTML');
+}
+
 function runPromptDocCheck(): void {
   const doc = readFileSync(resolve(process.cwd(), 'prompts/system-he.md'), 'utf8');
   for (const sentence of SYSTEM_PROMPT_MATCH) {
@@ -333,6 +483,8 @@ export async function runAiChecks(): Promise<number> {
 
   try {
     runPromptDocCheck();
+    runGroundingFieldChecks(grounding);
+    runMarkdownChecks();
     runPrivacyChecks(grounding);
     await runHandlerChecks(grounding);
     await runCompletionLimitChecks(grounding);
