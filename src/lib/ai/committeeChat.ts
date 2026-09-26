@@ -243,13 +243,21 @@ function draftForTenant(tenant: Tenant, grounding: AiGroundingContext): string {
   const greeting = tenant.displayName
     ? `שלום ${tenant.displayName} (דירה ${tenant.apartment}),`
     : `שלום (דירה ${tenant.apartment}),`;
-  return [
+  const lines = [
     'טיוטה להעתקה (לא נשלחה):',
     '',
     '---',
     greeting,
     '',
-    `לפי רישומי ועד הבית בבניין ${grounding.building.name}, יתרת הדירה שלכם עומדת על חוב של ${formatNis(tenant.balance)}.`,
+    `לפי רישומי ועד הבית בבניין ${grounding.building.name}, יתרת הדירה שלכם עומדת על חוב של ${formatNis(tenant.balance)}.`
+  ];
+  if (tenant.paymentMethod) {
+    lines.push('', `אמצעי התשלום הרשום לדירה: ${tenant.paymentMethod}.`);
+  }
+  if (tenant.balanceNote) {
+    lines.push('', tenant.balanceNote);
+  }
+  lines.push(
     '',
     'נשמח אם תוכלו להסדיר את התשלום בהקדם. לשאלות אפשר לפנות לוועד הבית.',
     '',
@@ -258,7 +266,8 @@ function draftForTenant(tenant: Tenant, grounding: AiGroundingContext): string {
     '---',
     '',
     'זו טיוטה בלבד לוועד להעתיק. לא נשלחה לדייר.'
-  ].join('\n');
+  );
+  return lines.join('\n');
 }
 
 function answerU4(message: string, grounding: AiGroundingContext): string {
@@ -361,11 +370,21 @@ export function sanitizeGrounding(input: unknown): AiGroundingContext | null {
     const displayName = typeof row.displayName === 'string' ? row.displayName : '';
     const lastPaymentAt =
       typeof row.lastPaymentAt === 'string' && row.lastPaymentAt ? row.lastPaymentAt : undefined;
+    const paymentMethod =
+      typeof row.paymentMethod === 'string' && row.paymentMethod.trim()
+        ? row.paymentMethod.trim()
+        : undefined;
+    const balanceNote =
+      typeof row.balanceNote === 'string' && row.balanceNote.trim()
+        ? row.balanceNote.trim()
+        : undefined;
     tenants.push({
       apartment,
       displayName,
       balance: tenantBalance,
-      ...(lastPaymentAt ? { lastPaymentAt } : {})
+      ...(lastPaymentAt ? { lastPaymentAt } : {}),
+      ...(paymentMethod ? { paymentMethod } : {}),
+      ...(balanceNote ? { balanceNote } : {})
     });
   }
 

@@ -181,11 +181,15 @@ export function buildAiGroundingContext(
         const lastIncome = sorted.find(
           (t) => t.type === 'income' && t.apartmentNumber === p.propertyNumber
         );
+        const paymentMethod = p.paymentMethod?.trim();
+        const balanceNote = p.balanceNote?.trim();
         return {
           apartment: String(p.propertyNumber),
           displayName: p.residents,
           balance: p.currentBalance,
-          lastPaymentAt: lastIncome?.date
+          lastPaymentAt: lastIncome?.date,
+          ...(paymentMethod ? { paymentMethod } : {}),
+          ...(balanceNote ? { balanceNote } : {})
         };
       }),
     ledger: sorted.slice(0, 200).map((t) => ({

@@ -1,8 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { Copy, MessageSquareText, Send, Sparkles } from 'lucide-react';
 import { useBuilding } from '../../context/BuildingContext';
+import { markdownToPlainText } from '../../lib/assistantMarkdown';
 import { buildAiGroundingContext } from '../../lib/aiGrounding';
 import { getSupabase, isSupabaseConfigured } from '../../lib/supabaseClient';
+import { AssistantMarkdown } from './AssistantMarkdown';
 
 type ChatTurn = {
   id: string;
@@ -175,18 +177,18 @@ export const CommitteeAiChat: React.FC = () => {
           {turns.map((turn) => (
             <div
               key={turn.id}
-              className={`rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
+              className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                 turn.role === 'user'
-                  ? 'bg-slate-900 text-white mr-8'
+                  ? 'bg-slate-900 text-white mr-8 whitespace-pre-wrap'
                   : 'bg-white border border-slate-200 text-slate-800 ml-8'
               }`}
             >
-              {turn.text}
+              {turn.role === 'assistant' ? <AssistantMarkdown text={turn.text} /> : turn.text}
               {turn.role === 'assistant' && turn.draft && (
                 <div className="mt-3 pt-3 border-t border-slate-100">
                   <button
                     type="button"
-                    onClick={() => void copyText(turn.id, turn.text)}
+                    onClick={() => void copyText(turn.id, markdownToPlainText(turn.text))}
                     className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5"
                   >
                     <Copy className="w-3.5 h-3.5" />
